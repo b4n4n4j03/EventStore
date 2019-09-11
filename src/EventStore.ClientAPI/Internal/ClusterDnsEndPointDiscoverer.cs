@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using EventStore.ClientAPI;
 using EventStore.ClientAPI.Common.Utils;
 using EventStore.ClientAPI.Exceptions;
 using EventStore.ClientAPI.Messages;
@@ -20,7 +19,7 @@ namespace EventStore.ClientAPI.Internal {
 		private readonly int _managerExternalHttpPort;
 		private readonly GossipSeed[] _gossipSeeds;
 
-		private readonly HttpAsyncClient _client;
+		private readonly IHttpClient _client;
 		private ClusterMessages.MemberInfoDto[] _oldGossip;
 		private TimeSpan _gossipTimeout;
 
@@ -32,7 +31,8 @@ namespace EventStore.ClientAPI.Internal {
 			int managerExternalHttpPort,
 			GossipSeed[] gossipSeeds,
 			TimeSpan gossipTimeout,
-			NodePreference nodePreference) {
+			NodePreference nodePreference,
+			IHttpClient client = null) {
 			Ensure.NotNull(log, "log");
 
 			_log = log;
@@ -41,7 +41,7 @@ namespace EventStore.ClientAPI.Internal {
 			_managerExternalHttpPort = managerExternalHttpPort;
 			_gossipSeeds = gossipSeeds;
 			_gossipTimeout = gossipTimeout;
-			_client = new HttpAsyncClient(_gossipTimeout);
+			_client = client ?? new HttpAsyncClient(_gossipTimeout);
 			_nodePreference = nodePreference;
 		}
 
@@ -171,7 +171,7 @@ namespace EventStore.ClientAPI.Internal {
 			ClusterMessages.ClusterInfoDto result = null;
 			var completed = new ManualResetEventSlim(false);
 
-			var url = endPoint.EndPoint.ToHttpUrl(EndpointExtensions.HTTP_SCHEMA, "/gossip?format=json");
+			var url = endPoint.EndPoint.ToHttpUrl(endPoint.SeedOverTls ? EndpointExtensions.HTTPS_SCHEMA : EndpointExtensions.HTTP_SCHEMA, "/gossip?format=json");
 			_client.Get(
 				url,
 				null,
