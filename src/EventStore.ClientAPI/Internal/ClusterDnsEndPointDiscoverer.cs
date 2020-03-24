@@ -9,6 +9,7 @@ using EventStore.ClientAPI.Exceptions;
 using EventStore.ClientAPI.Messages;
 using EventStore.ClientAPI.Transport.Http;
 using System.Linq;
+using System.Net.Http;
 using HttpStatusCode = EventStore.ClientAPI.Transport.Http.HttpStatusCode;
 
 namespace EventStore.ClientAPI.Internal {
@@ -220,7 +221,7 @@ namespace EventStore.ClientAPI.Internal {
 				case NodePreference.Random:
 					RandomShuffle(nodes, 0, nodes.Length - 1);
 					break;
-				case NodePreference.Follower:
+				case NodePreference.Slave:
 					nodes = nodes.OrderBy(nodeEntry => 
 							nodeEntry.State != ClusterMessages.VNodeState.Follower &&
 							 nodeEntry.State != ClusterMessages.VNodeState.Slave)
@@ -228,12 +229,6 @@ namespace EventStore.ClientAPI.Internal {
 					RandomShuffle(nodes, 0,
 						nodes.Count(nodeEntry => nodeEntry.State == ClusterMessages.VNodeState.Follower ||
 						                          nodeEntry.State == ClusterMessages.VNodeState.Slave) - 1);
-					break;
-				case NodePreference.ReadOnlyReplica:
-					nodes = nodes.OrderBy(nodeEntry => !IsReadOnlyReplicaState(nodeEntry.State))
-						.ToArray(); // OrderBy is a stable sort and only affects order of matching entries
-					RandomShuffle(nodes, 0,
-						nodes.Count(nodeEntry => nodeEntry.State == ClusterMessages.VNodeState.Slave) - 1);
 					break;
 			}
 
