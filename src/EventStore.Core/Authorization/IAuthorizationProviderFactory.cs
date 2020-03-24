@@ -1,7 +1,5 @@
-﻿using EventStore.Core.Bus;
-
-namespace EventStore.Core.Authorization {
+﻿namespace EventStore.Core.Authorization {
 	public interface IAuthorizationProviderFactory {
-		IAuthorizationProvider Build(IPublisher mainQueue);
+		IAuthorizationProvider Build();
 	}
 }

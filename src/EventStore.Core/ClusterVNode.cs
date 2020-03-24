@@ -342,8 +342,10 @@ namespace EventStore.Core {
 
 			Ensure.NotNull(_internalAuthenticationProvider, "authenticationProvider");
 
-
-			_authorizationProvider = vNodeSettings.AuthorizationProviderFactory.Build(_mainQueue);
+			_authorizationProvider = vNodeSettings.AuthorizationProviderFactory
+				.GetFactory(new AuthorizationProviderFactoryComponents {
+					MainQueue = _mainQueue
+				}).Build();
 			Ensure.NotNull(_authorizationProvider, "authorizationProvider");
 			AuthorizationGateway = new AuthorizationGateway(_authorizationProvider);
 			{

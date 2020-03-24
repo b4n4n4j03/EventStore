@@ -18,6 +18,7 @@ using EventStore.Core.Services.Monitoring;
 using EventStore.Core.Services.Transport.Http.Controllers;
 using EventStore.Core.Util;
 using System.Threading.Tasks;
+using EventStore.Core.Authorization;
 using EventStore.Core.Services;
 using EventStore.Core.Services.PersistentSubscription.ConsumerStrategy;
 using EventStore.Rags;
@@ -357,13 +358,23 @@ namespace EventStore.ClusterNode {
 			} else if (!options.Dev)
 				throw new Exception("A TLS Certificate is required unless development mode (--dev) is set.");
 
+			var authorizationConfig = String.IsNullOrEmpty(options.AuthorizationConfig)
+				? options.Config
+				: options.AuthorizationConfig;
 			var authenticationConfig = String.IsNullOrEmpty(options.AuthenticationConfig)
 				? options.Config
 				: options.AuthenticationConfig;
+			
 			var plugInContainer = FindPlugins();
+			
+			var authorizationProviderFactory =
+				GetAuthorizationProviderFactory(options.AuthorizationType, authorizationConfig, plugInContainer);
 			var authenticationProviderFactory =
 				GetAuthenticationProviderFactory(options.AuthenticationType, authenticationConfig, plugInContainer);
+			
 			var consumerStrategyFactories = GetPlugInConsumerStrategyFactories(plugInContainer);
+			
+			builder.WithAuthorizationProvider(authorizationProviderFactory);
 			builder.WithAuthenticationProvider(authenticationProviderFactory);
 			var subsystemFactories = GetPlugInSubsystemFactories(plugInContainer);
 
@@ -393,6 +404,40 @@ namespace EventStore.ClusterNode {
 			}
 
 			return strategyFactories.ToArray();
+		}
+		
+		private static AuthorizationProviderFactory GetAuthorizationProviderFactory(string authorizationType,
+			string authorizationConfigFile, CompositionContainer plugInContainer) {
+			var potentialPlugins = plugInContainer.GetExports<IAuthorizationPlugin>();
+
+			var authorizationTypeToPlugin = new Dictionary<string, AuthorizationProviderFactory> {
+				{"internal", new AuthorizationProviderFactory(components =>
+					new LegacyAuthorizationProviderFactory(components.MainQueue)) }
+			};
+
+			foreach (var potentialPlugin in potentialPlugins) {
+				try {
+					var plugin = potentialPlugin.Value;
+					var commandLine = plugin.CommandLineName.ToLowerInvariant();
+					Log.Information(
+						"Loaded authorization plugin: {plugin} version {version} (Command Line: {commandLine})",
+						plugin.Name, plugin.Version, commandLine);
+					authorizationTypeToPlugin.Add(commandLine,
+						new AuthorizationProviderFactory(_ => plugin.GetAuthorizationProviderFactory(authorizationConfigFile)));
+				} catch (CompositionException ex) {
+					Log.Error(ex, "Error loading authentication plugin.");
+				}
+			}
+
+			if (!authorizationTypeToPlugin.TryGetValue(authorizationType.ToLowerInvariant(), out var factory)) {
+				throw new ApplicationInitializationException(
+					$"The authorization type {authorizationType} is not recognised. If this is supposed " +
+					$"to be provided by an authorization plugin, confirm the plugin DLL is located in {Locations.PluginsDirectory}." +
+					Environment.NewLine +
+					$"Valid options for authorization are: {string.Join(", ", authorizationTypeToPlugin.Keys)}.");
+			}
+
+			return factory;
 		}
 
 		private static IAuthenticationProviderFactory GetAuthenticationProviderFactory(string authenticationType,
