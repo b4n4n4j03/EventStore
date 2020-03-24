@@ -94,6 +94,21 @@ namespace EventStore.Core.Messages {
 			}
 		}
 
+		public class DiscoveredLeader : Message {
+			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
+
+			public override int MsgTypeId {
+				get { return TypeId; }
+			}
+
+			public readonly VNodeInfo Leader;
+
+			public DiscoveredLeader(VNodeInfo leader) {
+				Ensure.NotNull(leader, "leader");
+				Leader = leader;
+			}
+		}
+
 		public abstract class StateChangeMessage : Message {
 			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
 
@@ -171,6 +186,18 @@ namespace EventStore.Core.Messages {
 
 			public BecomeUnknown(Guid correlationId)
 				: base(correlationId, VNodeState.Unknown) {
+			}
+		}
+
+		public class BecomeDiscoverLeader : StateChangeMessage {
+			private static readonly int TypeId = Interlocked.Increment(ref NextMsgId);
+
+			public override int MsgTypeId {
+				get { return TypeId; }
+			}
+
+			public BecomeDiscoverLeader(Guid correlationId)
+				: base(correlationId, VNodeState.DiscoverLeader) {
 			}
 		}
 
